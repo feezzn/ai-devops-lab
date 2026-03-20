@@ -1,0 +1,19 @@
+# Exemplo de log de Kubernetes com CrashLoopBackOff para testes do analisador.
+[2026-03-20T12:10:01Z] kubectl apply -f deployment.yaml
+deployment.apps/api-service configured
+[2026-03-20T12:10:15Z] kubectl rollout status deployment/api-service
+Waiting for deployment "api-service" rollout to finish: 0 of 2 updated replicas are available...
+[2026-03-20T12:10:35Z] kubectl describe pod api-service-6f9d7f5b8c-9zq2l
+Warning  BackOff    2m10s (x8 over 4m22s)  kubelet  Back-off restarting failed container
+Warning  Unhealthy  90s (x6 over 4m10s)    kubelet  Readiness probe failed: Get "http://10.42.0.15:8080/health": dial tcp 10.42.0.15:8080: connect: connection refused
+State:    Waiting
+Reason:   CrashLoopBackOff
+Last State: Terminated
+Reason:   Error
+Exit Code: 1
+[2026-03-20T12:10:36Z] kubectl logs api-service-6f9d7f5b8c-9zq2l --previous
+Traceback (most recent call last):
+  File "/app/main.py", line 12, in <module>
+    raise RuntimeError("DATABASE_URL environment variable is required")
+RuntimeError: DATABASE_URL environment variable is required
+[2026-03-20T12:10:40Z] Rollout failed

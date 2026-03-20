@@ -17,6 +17,16 @@ on:
         options:
           - test
           - real
+      sample_log:
+        description: "Arquivo de log de exemplo para testes manuais"
+        required: true
+        default: "samples/sample_ci_failure.log"
+        type: choice
+        options:
+          - samples/sample_ci_failure.log
+          - samples/sample_k8s_crashloop.log
+          - samples/sample_yaml_error.log
+          - samples/sample_auth_failure.log
 
 permissions:
   contents: read
@@ -38,7 +48,7 @@ jobs:
       LOG_FILE: samples/build.log
       ANALYSIS_FILE: samples/analysis.json
       SUMMARY_FILE: samples/summary.md
-      SAMPLE_LOG_FILE: samples/sample_ci_failure.log
+      SAMPLE_LOG_FILE: ${{ github.event_name == 'workflow_dispatch' && inputs.sample_log || 'samples/sample_ci_failure.log' }}
     steps:
       - name: Baixar codigo do repositorio
         uses: actions/checkout@v4
@@ -57,6 +67,7 @@ jobs:
         shell: bash
         run: |
           echo "Modo atual: $RUN_MODE"
+          echo "Log selecionado: $SAMPLE_LOG_FILE"
 
       - name: Simular build com falha e capturar logs
         if: env.RUN_MODE == 'test'

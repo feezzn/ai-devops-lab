@@ -67,8 +67,22 @@ Hoje o projeto procura principalmente por estes tipos de problema:
 - incompatibilidade de versão
 - erro de sintaxe YAML
 - falha de autenticação
+- erro de runtime no Kubernetes
+- erro de banco de dados
+- falha de inicialização de container
 
 Se o erro não combinar com essas regras, ele marca como `unknown`.
+
+## Logs de exemplo incluidos
+
+Voce pode testar manualmente diferentes cenarios usando os arquivos:
+
+- `samples/sample_ci_failure.log`
+- `samples/sample_k8s_crashloop.log`
+- `samples/sample_yaml_error.log`
+- `samples/sample_auth_failure.log`
+
+No `workflow_dispatch`, basta escolher o arquivo desejado no campo `sample_log`.
 
 ## Observações
 

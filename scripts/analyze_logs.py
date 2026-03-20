@@ -30,6 +30,9 @@ ANALYSIS_SCHEMA = {
                 "version_mismatch",
                 "yaml_syntax_issue",
                 "authentication_failure",
+                "kubernetes_runtime_error",
+                "database_error",
+                "container_startup_failure",
                 "unknown",
             ],
         },
@@ -68,9 +71,9 @@ ISSUE_RULES = {
             r"error: failed to solve:.*not found",
         ],
         "actions": [
-            "Verify the dependency name and version exist in the package registry.",
-            "Regenerate the lockfile or dependency manifest if it is stale.",
-            "Check whether the CI environment has access to the required package source.",
+            "Verifique se o nome e a versao da dependencia existem no registro de pacotes.",
+            "Regenere o lockfile ou manifesto de dependencias se ele estiver desatualizado.",
+            "Confirme se o ambiente de CI tem acesso a fonte de pacotes necessaria.",
         ],
     },
     "version_mismatch": {
@@ -84,9 +87,9 @@ ISSUE_RULES = {
             r"found .* but expected",
         ],
         "actions": [
-            "Align the CI runtime version with the application's declared requirements.",
-            "Pin compatible dependency versions and update the lockfile.",
-            "Review recent version bumps in the workflow, Dockerfile, or build image.",
+            "Alinhe a versao do runtime do CI com os requisitos declarados pela aplicacao.",
+            "Fixe versoes compativeis das dependencias e atualize o lockfile.",
+            "Revise mudancas recentes de versao no workflow, Dockerfile ou imagem de build.",
         ],
     },
     "yaml_syntax_issue": {
@@ -99,9 +102,9 @@ ISSUE_RULES = {
             r"error converting YAML to JSON",
         ],
         "actions": [
-            "Validate the YAML file with a linter before running the pipeline.",
-            "Inspect indentation, quoting, and colon placement near the reported line.",
-            "Compare the changed YAML against a known-good version.",
+            "Valide o arquivo YAML com um linter antes de executar o pipeline.",
+            "Inspecione indentacao, aspas e uso de dois-pontos perto da linha reportada.",
+            "Compare o YAML alterado com uma versao conhecida como valida.",
         ],
     },
     "authentication_failure": {
@@ -117,9 +120,54 @@ ISSUE_RULES = {
             r"not authorized",
         ],
         "actions": [
-            "Verify the CI secret or token is present and not expired.",
-            "Check the service account, IAM role, or registry permissions used by the job.",
-            "Confirm the workflow is exposing the secret to the failing step or environment.",
+            "Verifique se o secret ou token do CI esta presente e nao expirou.",
+            "Confira a service account, role IAM ou permissoes de registry usadas pelo job.",
+            "Confirme se o workflow esta expondo o secret para a etapa ou ambiente correto.",
+        ],
+    },
+    "kubernetes_runtime_error": {
+        "patterns": [
+            r"CrashLoopBackOff",
+            r"Back-off restarting failed container",
+            r"ErrImagePull",
+            r"ImagePullBackOff",
+            r"Readiness probe failed",
+            r"Liveness probe failed",
+            r"OOMKilled",
+        ],
+        "actions": [
+            "Verifique eventos do pod e logs do container para identificar a causa imediata da falha.",
+            "Confirme probes, imagem do container, variaveis de ambiente e recursos configurados.",
+            "Valide se a aplicacao sobe corretamente fora do cluster ou com configuracao minima.",
+        ],
+    },
+    "database_error": {
+        "patterns": [
+            r"no such table",
+            r"connection refused",
+            r"could not connect to server",
+            r"migration failed",
+            r"database .* does not exist",
+            r"sqlstate",
+        ],
+        "actions": [
+            "Confirme se o banco esta acessivel e se as migrations foram aplicadas antes dos testes.",
+            "Revise credenciais, endpoint e ordem de inicializacao dos servicos dependentes.",
+            "Adicione validacoes de readiness do schema antes de executar testes ou aplicacao.",
+        ],
+    },
+    "container_startup_failure": {
+        "patterns": [
+            r"exec format error",
+            r"container exited with code",
+            r"standard_init_linux.go",
+            r"failed to start container",
+            r"startup probe failed",
+        ],
+        "actions": [
+            "Verifique o entrypoint, comando de inicializacao e arquitetura da imagem.",
+            "Teste a imagem localmente para reproduzir o erro de startup antes do deploy.",
+            "Revise variaveis obrigatorias e dependencias necessarias no boot do container.",
         ],
     },
 }
@@ -216,7 +264,7 @@ def detect_known_issue(log_text: str) -> dict:
         evidence = extract_evidence(log_text, rule["patterns"])
         if evidence:
             return {
-                "summary": f"Detected likely {category.replace('_', ' ')} in the CI/CD log.",
+                "summary": f"Foi detectado um provavel caso de {category.replace('_', ' ')} no log de CI/CD.",
                 "root_cause": evidence[0],
                 "category": category,
                 "recommended_actions": rule["actions"],
@@ -225,13 +273,13 @@ def detect_known_issue(log_text: str) -> dict:
             }
 
     return {
-        "summary": "No known CI/CD error pattern matched the log.",
-        "root_cause": "Unable to determine a specific issue from local rules alone.",
+        "summary": "Nenhum padrao conhecido de erro de CI/CD combinou com o log.",
+        "root_cause": "Nao foi possivel determinar um problema especifico usando apenas as regras locais.",
         "category": "unknown",
         "recommended_actions": [
-            "Review the failing step and nearby log lines for the first explicit error.",
-            "Add more step-level logging or artifact capture if the failure remains ambiguous.",
-            "Use the structured output to route the failure to the most likely owning team.",
+            "Revise a etapa com falha e as linhas proximas ao primeiro erro explicito.",
+            "Adicione mais logs por etapa ou artefatos se a falha continuar ambigua.",
+            "Use a saida estruturada para encaminhar a falha ao time mais provavel.",
         ],
         "confidence_score": 0.35,
         "evidence": [],
@@ -243,7 +291,7 @@ def validate_analysis(data: dict) -> dict:
     required_keys = set(ANALYSIS_SCHEMA["required"])
     missing = sorted(required_keys - set(data))
     if missing:
-        raise ValueError(f"Model response is missing required keys: {', '.join(missing)}")
+        raise ValueError(f"A resposta do modelo nao contem as chaves obrigatorias: {', '.join(missing)}")
     return data
 
 
@@ -257,7 +305,9 @@ Return only JSON that matches the provided schema.
 Required behavior:
 - Focus on the single most likely root cause.
 - Prefer one of these categories when it fits: dependency_error, version_mismatch,
-  yaml_syntax_issue, authentication_failure.
+  yaml_syntax_issue, authentication_failure, kubernetes_runtime_error,
+  database_error, container_startup_failure.
+- The JSON values must be written in Brazilian Portuguese, except for the category field.
 - Keep the summary concise and operational.
 - Do not repeat or expose secrets even if they appear in the log.
 - Confidence score must be between 0 and 1.
@@ -307,7 +357,7 @@ def main() -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    print(f"Analysis written to {args.output_file}")
+    print(f"Analise gravada em {args.output_file}")
     return 0
 
 

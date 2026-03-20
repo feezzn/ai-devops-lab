@@ -1,0 +1,7 @@
+# Exemplo de log com falha de autenticacao.
+[2026-03-20T14:20:01Z] Logging in to container registry
+docker login myregistry.azurecr.io -u ci-bot -p ***
+Error response from daemon: Get "https://myregistry.azurecr.io/v2/": unauthorized: authentication required
+[2026-03-20T14:20:03Z] Retrying image pull
+failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://myregistry.azurecr.io/oauth2/token: 401 Unauthorized
+[2026-03-20T14:20:04Z] Job failed with exit code 1

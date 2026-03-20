@@ -1,0 +1,6 @@
+# Exemplo de log com erro de sintaxe YAML.
+[2026-03-20T13:00:01Z] helm upgrade --install myapp ./chart
+Error: YAML parse error on myapp/templates/deployment.yaml: error converting YAML to JSON: yaml: line 27: mapping values are not allowed in this context
+[2026-03-20T13:00:02Z] Rendering templates for debugging
+Error: parse error at (myapp/templates/deployment.yaml:27): mapping values are not allowed here
+[2026-03-20T13:00:03Z] Job failed with exit code 1
