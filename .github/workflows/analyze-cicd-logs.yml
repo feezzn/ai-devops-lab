@@ -1,11 +1,22 @@
-# Este workflow simula uma falha de build, captura o log, tenta analisar com Azure OpenAI
-# e publica um resumo em Markdown no sumario do GitHub Actions.
+# Este workflow pode rodar em dois modos:
+# - teste: simula uma falha de build para demonstrar a analise
+# - real: usa um log existente do repositorio sem falhar a branch principal
 name: Analise de Logs CI com IA
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo de execucao do workflow"
+        required: true
+        default: "test"
+        type: choice
+        options:
+          - test
+          - real
 
 permissions:
   contents: read
@@ -15,7 +26,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  analyze-failing-build:
+  analyze-logs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -23,9 +34,11 @@ jobs:
       AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
       AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
       AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+      RUN_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'real' }}
       LOG_FILE: samples/build.log
       ANALYSIS_FILE: samples/analysis.json
       SUMMARY_FILE: samples/summary.md
+      SAMPLE_LOG_FILE: samples/sample_ci_failure.log
     steps:
       - name: Baixar codigo do repositorio
         uses: actions/checkout@v4
@@ -40,7 +53,12 @@ jobs:
       - name: Instalar dependencias Python
         run: pip install -r requirements.txt
 
+      - name: Mostrar modo selecionado
+        shell: bash
+        run: echo "Modo atual: $RUN_MODE"
+
       - name: Simular build com falha e capturar logs
+        if: env.RUN_MODE == 'test'
         id: simulated_build
         continue-on-error: true
         shell: bash
@@ -54,6 +72,13 @@ jobs:
             echo "[ERROR] Falha no build durante a instalacao de dependencias"
             exit 1
           } 2>&1 | tee "$LOG_FILE"
+
+      - name: Preparar log de entrada no modo real
+        if: env.RUN_MODE == 'real'
+        shell: bash
+        run: |
+          mkdir -p "$(dirname "$LOG_FILE")"
+          cp "$SAMPLE_LOG_FILE" "$LOG_FILE"
 
       - name: Verificar configuracao do Azure OpenAI
         if: always()
@@ -120,8 +145,8 @@ jobs:
             samples/analysis.json
             samples/summary.md
 
-      - name: Marcar job como falho se o build simulado falhar
-        if: always() && steps.simulated_build.outcome == 'failure'
+      - name: Marcar job como falho no modo teste
+        if: always() && env.RUN_MODE == 'test' && steps.simulated_build.outcome == 'failure'
         shell: bash
         run: |
           echo "O build simulado falhou como esperado. Veja o resumo acima." >&2
