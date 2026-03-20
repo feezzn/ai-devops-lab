@@ -34,7 +34,6 @@ jobs:
           cache-dependency-path: ai-devops-lab/requirements.txt
 
       - name: Install Python dependencies
-        working-directory: ai-devops-lab
         run: pip install -r requirements.txt
 
       - name: Simulate failing build and capture logs
