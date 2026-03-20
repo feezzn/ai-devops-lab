@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a Markdown summary from the JSON analysis output."""
+"""Gera um resumo em Markdown a partir da saida JSON da analise."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    # This script stays file-based so it can be chained easily in CI.
+    # Este script trabalha com arquivos para ser encadeado facilmente no CI.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-file", required=True, help="Path to the JSON report.")
     parser.add_argument(
@@ -30,26 +30,26 @@ def render_markdown(report: dict) -> str:
         f"- {item}" for item in report.get("recommended_actions", [])
     )
 
-    # The summary format is intentionally plain so it works well in GitHub job summaries and PR comments.
-    return f"""# CI/CD Debug Summary
+    # O formato e simples para funcionar bem no resumo do job e em comentarios de PR.
+    return f"""# Resumo de Depuracao de CI/CD
 
-## Summary
-{report.get("summary", "No summary available.")}
+## Resumo
+{report.get("summary", "Nenhum resumo disponivel.")}
 
-## Root Cause
-{report.get("root_cause", "Unknown")}
+## Causa Raiz
+{report.get("root_cause", "Desconhecida")}
 
-## Category
+## Categoria
 {report.get("category", "unknown")}
 
-## Confidence Score
-{report.get("confidence_score", "unknown")}
+## Confianca
+{report.get("confidence_score", "desconhecida")}
 
-## Evidence
-{evidence_lines or "- No evidence captured."}
+## Evidencias
+{evidence_lines or "- Nenhuma evidencia capturada."}
 
-## Recommended Actions
-{action_lines or "- No recommendations provided."}
+## Acoes Recomendadas
+{action_lines or "- Nenhuma recomendacao fornecida."}
 """
 
 

@@ -1,16 +1,16 @@
 # ai-devops-lab
 
-Minimal Python project for AI-assisted CI/CD debugging with Azure OpenAI Responses API.
+Projeto Python minimalista para depuração de CI/CD com ajuda de IA usando a Responses API do Azure OpenAI.
 
-## What it does
+## O que este projeto faz
 
-- Reads a CI/CD log file.
-- Sends the log to an Azure OpenAI deployment for analysis.
-- Saves a structured JSON report.
-- Renders a Markdown summary that can be uploaded from CI.
-- Applies basic secret redaction and input truncation before sending logs to the model.
+- Lê um arquivo de log de CI/CD.
+- Envia o log para um deployment do Azure OpenAI para análise.
+- Salva um relatório estruturado em JSON.
+- Gera um resumo em Markdown para publicar no GitHub Actions.
+- Reduz o risco de exposição ao aplicar redação básica de segredos e truncamento de logs grandes.
 
-## Project layout
+## Estrutura do projeto
 
 ```text
 ai-devops-lab/
@@ -21,15 +21,15 @@ ai-devops-lab/
   requirements.txt
 ```
 
-## Environment variables
+## Variáveis de ambiente
 
-Set these before running the analyzer:
+Defina estas variáveis antes de executar a análise:
 
 - `AZURE_OPENAI_API_KEY`
-- `AZURE_OPENAI_ENDPOINT` like `https://your-resource.openai.azure.com`
-- `AZURE_OPENAI_DEPLOYMENT` like `gpt-4.1-mini`
+- `AZURE_OPENAI_ENDPOINT` como `https://seu-recurso.openai.azure.com`
+- `AZURE_OPENAI_DEPLOYMENT` como `gpt-4.1-mini`
 
-## Local usage
+## Como executar localmente
 
 ```bash
 python -m venv .venv
@@ -45,10 +45,41 @@ python scripts/render_summary.py \
   --output-file samples/summary.md
 ```
 
-## Notes
+## Como o fluxo funciona
 
-- The analyzer uses the Azure OpenAI `OpenAI` client with an Azure `base_url`.
-- Structured output is requested through the Responses API using a JSON schema.
-- The analyzer includes local detection rules for dependency issues, version mismatches, YAML syntax problems, and authentication failures.
-- Large logs are truncated and common secret patterns are redacted before the API call.
-- The sample workflow runs on `push` to `main`, simulates a failing build, captures the output to a log file, and publishes an AI-generated Markdown summary.
+1. O workflow simula uma falha de build.
+2. O log dessa falha é salvo em arquivo.
+3. O script `scripts/analyze_logs.py`:
+   - lê o log
+   - remove padrões comuns de segredo
+   - limita o tamanho do conteúdo enviado
+   - tenta classificar o erro localmente
+   - chama o Azure OpenAI para gerar uma análise estruturada
+4. O resultado é salvo em `samples/analysis.json`.
+5. O script `scripts/render_summary.py` converte esse JSON em Markdown.
+6. O GitHub Actions publica esse resumo na execução do job.
+
+## O que é analisado
+
+Hoje o projeto procura principalmente por estes tipos de problema:
+
+- erro de dependência
+- incompatibilidade de versão
+- erro de sintaxe YAML
+- falha de autenticação
+
+Se o erro não combinar com essas regras, ele marca como `unknown`.
+
+## Observações
+
+- O analisador usa o cliente `OpenAI` apontando para a URL base do Azure OpenAI.
+- A saída estruturada é solicitada com JSON Schema pela Responses API.
+- O workflow de exemplo roda em `push` para `main`, simula uma falha, salva o log e publica um resumo.
+- Se os segredos do Azure OpenAI não estiverem configurados, o workflow gera um resumo de fallback explicando por que a análise por IA foi pulada.
+
+## Próximos passos para testar de verdade
+
+- Configurar os secrets `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` e `AZURE_OPENAI_DEPLOYMENT` no GitHub.
+- Fazer um `git push` para a branch `main`.
+- Abrir a execução do GitHub Actions e verificar o resumo publicado no job.
+- Se quiser, você também pode rodar os scripts localmente com um log de exemplo antes de testar no GitHub.

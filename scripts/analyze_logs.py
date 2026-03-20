@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze CI/CD logs with Azure OpenAI and emit structured JSON."""
+"""Analisa logs de CI/CD com Azure OpenAI e gera JSON estruturado."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Any
 
 
-# Keep the payload bounded for predictable cost and lower risk of sending noisy logs.
+# Mantem o payload sob controle para reduzir custo e evitar enviar logs excessivos.
 MAX_LOG_CHARS = 12_000
 
 
-# The result contract is intentionally compact so downstream automation can rely on it.
+# O contrato de saida e enxuto para facilitar integracoes posteriores.
 ANALYSIS_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -54,7 +54,7 @@ ANALYSIS_SCHEMA = {
 }
 
 
-# Local patterns provide a first-pass classification before the model sees the log.
+# Regras locais fazem uma primeira classificacao antes da chamada ao modelo.
 ISSUE_RULES = {
     "dependency_error": {
         "patterns": [
@@ -136,7 +136,7 @@ SECRET_PATTERNS = [
 
 
 def parse_args() -> argparse.Namespace:
-    # CLI flags stay explicit so the script is easy to wire into GitHub Actions.
+    # Flags explicitas deixam o script simples de integrar ao GitHub Actions.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log-file", required=True, help="Path to the CI/CD log file.")
     parser.add_argument(
@@ -159,7 +159,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_client() -> Any:
-    # Azure OpenAI uses the standard OpenAI client pointed at the Azure v1 endpoint.
+    # No Azure OpenAI usamos o cliente padrao apontando para o endpoint v1 do Azure.
     from openai import OpenAI
 
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -239,7 +239,7 @@ def detect_known_issue(log_text: str) -> dict:
 
 
 def validate_analysis(data: dict) -> dict:
-    # A tiny validator keeps the script dependency-light while still failing fast on malformed output.
+    # Um validador pequeno evita dependencias extras e falha rapido em saidas invalidas.
     required_keys = set(ANALYSIS_SCHEMA["required"])
     missing = sorted(required_keys - set(data))
     if missing:
@@ -282,7 +282,7 @@ Sanitized CI/CD log:
         },
     )
 
-    # `output_text` is the simplest way to read the JSON body returned by the model.
+    # `output_text` e a forma mais simples de obter o JSON retornado pelo modelo.
     payload = json.loads(response.output_text)
     return validate_analysis(payload)
 
