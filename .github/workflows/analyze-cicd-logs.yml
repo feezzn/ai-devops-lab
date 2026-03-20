@@ -55,7 +55,8 @@ jobs:
 
       - name: Mostrar modo selecionado
         shell: bash
-        run: echo "Modo atual: $RUN_MODE"
+        run: |
+          echo "Modo atual: $RUN_MODE"
 
       - name: Simular build com falha e capturar logs
         if: env.RUN_MODE == 'test'
