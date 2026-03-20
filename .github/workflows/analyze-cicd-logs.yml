@@ -96,30 +96,32 @@ jobs:
           echo "missing=$missing" >> "$GITHUB_OUTPUT"
 
       - name: Analisar logs capturados com Azure OpenAI
+        id: azure_analysis
         if: always() && steps.azure_config.outputs.missing == '0'
+        continue-on-error: true
         run: |
           python scripts/analyze_logs.py \
             --log-file "$LOG_FILE" \
             --output-file "$ANALYSIS_FILE"
 
       - name: Gerar resumo de fallback sem IA
-        if: always() && steps.azure_config.outputs.missing != '0'
+        if: always() && (steps.azure_config.outputs.missing != '0' || steps.azure_analysis.outcome == 'failure')
         shell: bash
         run: |
           mkdir -p "$(dirname "$ANALYSIS_FILE")"
           cat > "$ANALYSIS_FILE" <<'EOF'
           {
-            "summary": "A analise com IA foi ignorada porque os secrets do Azure OpenAI nao foram configurados.",
-            "root_cause": "Ausencia de AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT ou AZURE_OPENAI_DEPLOYMENT.",
+            "summary": "A analise com IA nao produziu um resultado valido e o workflow gerou um fallback local.",
+            "root_cause": "Ausencia de secrets obrigatorios ou falha na execucao do script de analise.",
             "category": "unknown",
             "recommended_actions": [
-              "Criar os secrets do Azure OpenAI no repositorio GitHub.",
-              "Executar novamente o workflow apos configurar as credenciais.",
-              "Validar localmente os scripts antes do proximo push."
+              "Conferir AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT e AZURE_OPENAI_DEPLOYMENT no GitHub.",
+              "Verificar se a dependencia openai foi instalada corretamente no runner.",
+              "Reexecutar o workflow apos corrigir o erro da etapa de analise."
             ],
             "confidence_score": 1.0,
             "evidence": [
-              "O workflow detectou que uma ou mais variaveis obrigatorias nao estavam definidas."
+              "O workflow detectou ausencia de configuracao obrigatoria ou falha na etapa Azure OpenAI."
             ]
           }
           EOF
