@@ -15,6 +15,9 @@ Projeto Python minimalista para depuração de CI/CD com ajuda de IA usando a Re
 ```text
 ai-devops-lab/
   .github/workflows/
+  knowledge/
+  playbooks/
+  runbooks/
   samples/
   scripts/
   README.md
@@ -83,6 +86,24 @@ Voce pode testar manualmente diferentes cenarios usando os arquivos:
 - `samples/sample_auth_failure.log`
 
 No `workflow_dispatch`, basta escolher o arquivo desejado no campo `sample_log`.
+
+## Contexto operacional
+
+O laboratorio agora tambem inclui uma base inicial para evoluir a qualidade da analise:
+
+- `knowledge/`
+- `runbooks/`
+- `playbooks/`
+
+Essas pastas existem para registrar contexto adicional que a IA sozinha nao conhece, como:
+
+- erros frequentes do ambiente
+- formas de investigar cada falha
+- acoes operacionais padronizadas
+- orientacoes de rollback e triagem
+
+Esse modelo ajuda a sair do pensamento "basta ligar a IA" e evoluir para uma abordagem
+mais realista: IA + contexto + operacao.
 
 ## Observações
 
