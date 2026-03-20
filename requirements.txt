@@ -1,0 +1,2 @@
+# Minimal runtime dependencies for the sample project.
+openai>=1.68.0

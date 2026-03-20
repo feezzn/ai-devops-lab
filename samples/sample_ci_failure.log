@@ -1,0 +1,34 @@
+# Sample CI log used to test the analyzer locally and in GitHub Actions.
+[2026-03-20T10:00:01Z] Starting workflow: build-and-test
+[2026-03-20T10:00:03Z] Checking out repository
+[2026-03-20T10:00:06Z] Setting up Python 3.12
+[2026-03-20T10:00:09Z] Installing dependencies
+Collecting requests==2.32.0
+Collecting pytest==8.3.0
+Successfully installed requests-2.32.0 pytest-8.3.0
+[2026-03-20T10:00:20Z] Running unit tests
+============================= test session starts =============================
+platform linux -- Python 3.12.2, pytest-8.3.0
+collected 14 items
+
+tests/test_api.py ....                                                   [ 28%]
+tests/test_auth.py ..                                                    [ 42%]
+tests/test_db.py F...                                                    [ 71%]
+tests/test_worker.py ....                                                [100%]
+
+================================== FAILURES ==================================
+________________________ test_create_order_persists_row _______________________
+
+    def test_create_order_persists_row():
+>       row = repository.create_order({"id": 101, "total": 49.90})
+
+tests/test_db.py:18:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+app/repository.py:42: in create_order
+    connection.execute(query, payload)
+sqlite3.OperationalError: no such table: orders
+
+=========================== short test summary info ===========================
+FAILED tests/test_db.py::test_create_order_persists_row - sqlite3.OperationalError: no such table: orders
+========================= 1 failed, 13 passed in 4.21s =========================
+[2026-03-20T10:00:25Z] Job failed with exit code 1
