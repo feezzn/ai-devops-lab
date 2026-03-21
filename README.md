@@ -2,6 +2,9 @@
 
 Projeto Python minimalista para depuração de CI/CD com ajuda de IA usando a Responses API do Azure OpenAI.
 
+O laboratorio agora tambem inclui uma base inicial para simular um contexto corporativo com
+Azure Pipelines, GitOps/ArgoCD, AWS como provider e validacoes de seguranca.
+
 ## O que este projeto faz
 
 - Lê um arquivo de log de CI/CD.
@@ -15,6 +18,7 @@ Projeto Python minimalista para depuração de CI/CD com ajuda de IA usando a Re
 ```text
 ai-devops-lab/
   .github/workflows/
+  azure-pipelines.yml
   knowledge/
   playbooks/
   runbooks/
@@ -61,6 +65,24 @@ python scripts/render_summary.py \
 4. O resultado é salvo em `samples/analysis.json`.
 5. O script `scripts/render_summary.py` converte esse JSON em Markdown.
 6. O GitHub Actions publica esse resumo na execução do job.
+
+## Cenário corporativo
+
+Se a ideia for aproximar o laboratorio de um ambiente mais parecido com empresa, o repositorio
+ja inclui:
+
+- [azure-pipelines.yml](/home/felipe/LabAWS/ai-devops-lab/azure-pipelines.yml)
+- [BANKING_SCENARIO.md](/home/felipe/LabAWS/ai-devops-lab/BANKING_SCENARIO.md)
+
+Esse modo assume um fluxo parecido com:
+
+- Azure Pipelines para validacao e orquestracao
+- etapa de seguranca para SAST e analise de dependencias
+- analise de falhas com IA
+- GitOps/ArgoCD para entrega
+- AWS como provider principal da infra
+
+Hoje isso ainda esta como base de simulacao e arquitetura, nao como integracao completa.
 
 ## O que é analisado
 
