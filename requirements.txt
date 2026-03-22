@@ -1,3 +1,4 @@
 # Dependencias minimas de execucao para o laboratorio.
 openai>=1.68.0
 requests
+boto3

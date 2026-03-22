@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analisa logs de CI/CD com Azure OpenAI e gera JSON estruturado."""
+"""Analisa logs de CI/CD com Azure OpenAI ou AWS Bedrock e gera JSON estruturado."""
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ SECRET_PATTERNS = [
 
 
 def parse_args() -> argparse.Namespace:
-    # Flags explicitas deixam o script simples de integrar ao GitHub Actions.
+    # Flags explicitas deixam o script simples de integrar ao CI.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log-file", required=True, help="Path to the CI/CD log file.")
     parser.add_argument(
@@ -193,9 +193,15 @@ def parse_args() -> argparse.Namespace:
         help="Where to write the JSON analysis report.",
     )
     parser.add_argument(
+        "--provider",
+        choices=["azure", "aws"],
+        default=os.getenv("LLM_PROVIDER", "azure"),
+        help="LLM provider used for the analysis. Defaults to LLM_PROVIDER or azure.",
+    )
+    parser.add_argument(
         "--model",
-        default=os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini"),
-        help="Azure OpenAI deployment name. Defaults to AZURE_OPENAI_DEPLOYMENT.",
+        default=None,
+        help="Model or deployment identifier. Defaults to the provider-specific environment variable.",
     )
     parser.add_argument(
         "--max-log-chars",
@@ -206,7 +212,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_client() -> Any:
+def resolve_model(provider: str, explicit_model: str | None) -> str:
+    if explicit_model:
+        return explicit_model
+    if provider == "aws":
+        return os.getenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+    return os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-mini")
+
+
+def build_azure_client() -> Any:
     # No Azure OpenAI usamos o cliente padrao apontando para o endpoint v1 do Azure.
     from openai import OpenAI
 
@@ -221,6 +235,15 @@ def build_client() -> Any:
 
     base_url = endpoint.rstrip("/") + "/openai/v1/"
     return OpenAI(api_key=api_key, base_url=base_url)
+
+
+def build_aws_client() -> Any:
+    import boto3
+
+    region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")
+    if not region:
+        raise RuntimeError("Missing AWS region. Set AWS_REGION or AWS_DEFAULT_REGION.")
+    return boto3.client("bedrock-runtime", region_name=region)
 
 
 def read_log(log_file: Path) -> str:
@@ -295,10 +318,8 @@ def validate_analysis(data: dict) -> dict:
     return data
 
 
-def analyze_log(
-    client: Any, model: str, log_text: str, heuristic_result: dict
-) -> dict:
-    prompt = f"""
+def build_prompt(log_text: str, heuristic_result: dict) -> str:
+    return f"""
 You are an SRE assistant analyzing CI/CD logs.
 Return only JSON that matches the provided schema.
 
@@ -319,6 +340,12 @@ Sanitized CI/CD log:
 {log_text}
 """.strip()
 
+
+def analyze_log_azure(
+    client: Any, model: str, log_text: str, heuristic_result: dict
+) -> dict:
+    prompt = build_prompt(log_text, heuristic_result)
+
     response = client.responses.create(
         model=model,
         input=prompt,
@@ -332,8 +359,29 @@ Sanitized CI/CD log:
         },
     )
 
-    # `output_text` e a forma mais simples de obter o JSON retornado pelo modelo.
-    payload = json.loads(response.output_text)
+    payload = json.loads("\n".join(text_blocks).strip())
+    return validate_analysis(payload)
+
+
+def analyze_log_aws(
+    client: Any, model: str, log_text: str, heuristic_result: dict
+) -> dict:
+    prompt = build_prompt(log_text, heuristic_result)
+
+    response = client.converse(
+        modelId=model,
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": prompt}],
+            }
+        ],
+        inferenceConfig={"maxTokens": 800, "temperature": 0},
+    )
+
+    content = response["output"]["message"]["content"]
+    text_blocks = [item.get("text", "") for item in content if "text" in item]
+    payload = json.loads("\n".join(text_blocks).strip())
     return validate_analysis(payload)
 
 
@@ -346,12 +394,19 @@ def main() -> int:
     args = parse_args()
 
     try:
-        client = build_client()
         raw_log_text = read_log(Path(args.log_file))
         redacted_log_text = redact_secrets(raw_log_text)
         heuristic_result = detect_known_issue(redacted_log_text)
         safe_log_text = limit_log_size(redacted_log_text, args.max_log_chars)
-        analysis = analyze_log(client, args.model, safe_log_text, heuristic_result)
+        model = resolve_model(args.provider, args.model)
+
+        if args.provider == "aws":
+            client = build_aws_client()
+            analysis = analyze_log_aws(client, model, safe_log_text, heuristic_result)
+        else:
+            client = build_azure_client()
+            analysis = analyze_log_azure(client, model, safe_log_text, heuristic_result)
+
         write_output(Path(args.output_file), analysis)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)

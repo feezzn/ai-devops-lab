@@ -84,10 +84,12 @@ jobs:
         run: python -m pip install --upgrade boto3
 
       - name: Executar inferencia simples no Bedrock
+        id: bedrock_inference
         if: env.RUN_INFERENCE == 'true'
+        continue-on-error: true
         shell: bash
         run: |
-          python - <<'PY'
+          python - <<'PY' | tee /tmp/bedrock_inference.log
           import json
           import os
           import boto3
@@ -110,6 +112,20 @@ jobs:
           print(json.dumps(response, indent=2, default=str))
           PY
 
+      - name: Classificar resultado da inferencia
+        if: always() && env.RUN_INFERENCE == 'true'
+        shell: bash
+        run: |
+          if [ ! -f /tmp/bedrock_inference.log ]; then
+            echo "INFERENCE_STATUS=not_executed" >> "$GITHUB_ENV"
+          elif grep -qi "Too many tokens per day" /tmp/bedrock_inference.log; then
+            echo "INFERENCE_STATUS=quota_blocked" >> "$GITHUB_ENV"
+          elif [ "${{ steps.bedrock_inference.outcome }}" = "success" ]; then
+            echo "INFERENCE_STATUS=success" >> "$GITHUB_ENV"
+          else
+            echo "INFERENCE_STATUS=failed" >> "$GITHUB_ENV"
+          fi
+
       - name: Publicar resumo do job
         if: always()
         shell: bash
@@ -121,6 +137,20 @@ jobs:
             echo "- Role ARN: $AWS_ROLE_ARN"
             echo "- Model ID: $BEDROCK_MODEL_ID"
             echo "- Inference habilitada: $RUN_INFERENCE"
+            if [ "$RUN_INFERENCE" = "true" ]; then
+              echo "- Status da inferencia: ${INFERENCE_STATUS:-unknown}"
+            fi
             echo
-            echo "Consulte os logs da execucao para ver o resultado do STS, a listagem de modelos e a inferencia opcional."
+            if [ "${INFERENCE_STATUS:-}" = "quota_blocked" ]; then
+              echo "A autenticacao AWS e o acesso ao Bedrock funcionaram, mas a conta esta com quota aplicada insuficiente para inferencia neste modelo/profile."
+              echo
+              echo "Passos recomendados:"
+              echo "- Verificar Amazon Bedrock > Service Quotas na regiao escolhida"
+              echo "- Confirmar se a quota aplicada nao esta em 0"
+              echo "- Manter run_inference=false para validar apenas OIDC + STS + listagem de modelos"
+            elif [ "$RUN_INFERENCE" = "true" ] && [ "${INFERENCE_STATUS:-}" = "success" ]; then
+              echo "A inferencia foi executada com sucesso. Consulte os logs para ver a resposta completa do modelo."
+            else
+              echo "Consulte os logs da execucao para ver o resultado do STS, a listagem de modelos e a inferencia opcional."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
