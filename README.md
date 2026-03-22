@@ -134,6 +134,25 @@ mais realista: IA + contexto + operacao.
 - O workflow de exemplo roda em `push` para `main`, simula uma falha, salva o log e publica um resumo.
 - Se os segredos do Azure OpenAI não estiverem configurados, o workflow gera um resumo de fallback explicando por que a análise por IA foi pulada.
 
+## Teste AWS Bedrock no GitHub
+
+O repositorio agora tambem pode validar autenticacao AWS via GitHub OIDC e testar o Bedrock.
+
+Antes de rodar o workflow manual `Teste AWS Bedrock`, configure estas GitHub Actions Variables:
+
+- `AWS_ROLE_ARN` com a role assumivel via OIDC, por exemplo `arn:aws:iam::660830512266:role/azdo-ai-cicd-ops-lab`
+- `AWS_REGION` com a regiao do Bedrock, por exemplo `us-east-2`
+- `BEDROCK_MODEL_ID` com o modelo padrao para inferencia opcional, por exemplo `amazon.nova-lite-v1:0`
+
+O workflow:
+
+1. autentica na AWS via OIDC
+2. roda `aws sts get-caller-identity`
+3. lista modelos foundation disponiveis
+4. opcionalmente executa uma inferencia simples no Bedrock
+
+Esse fluxo e util para validar primeiro AWS + OIDC + Bedrock antes de integrar o provider AWS no restante do laboratorio.
+
 ## Próximos passos para testar de verdade
 
 - Configurar os secrets `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT` e `AZURE_OPENAI_DEPLOYMENT` no GitHub.

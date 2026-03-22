@@ -1,0 +1,126 @@
+name: Teste AWS Bedrock
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: "Regiao AWS para o teste"
+        required: true
+        default: "us-east-2"
+        type: choice
+        options:
+          - us-east-1
+          - us-east-2
+      run_inference:
+        description: "Executar chamada real ao Bedrock"
+        required: true
+        default: false
+        type: boolean
+      model_id:
+        description: "Model ID para inferencia opcional"
+        required: false
+        default: "amazon.nova-lite-v1:0"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aws-bedrock-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-bedrock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AWS_REGION: ${{ github.event.inputs.aws_region || vars.AWS_REGION || 'us-east-2' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      BEDROCK_MODEL_ID: ${{ github.event.inputs.model_id || vars.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0' }}
+      RUN_INFERENCE: ${{ github.event.inputs.run_inference || 'false' }}
+    steps:
+      - name: Baixar codigo do repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validar configuracao AWS
+        shell: bash
+        run: |
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "A variable AWS_ROLE_ARN nao foi configurada no GitHub." >&2
+            exit 1
+          fi
+          echo "Regiao AWS: $AWS_REGION"
+          echo "Model ID atual: $BEDROCK_MODEL_ID"
+          echo "Run inference: $RUN_INFERENCE"
+
+      - name: Configurar credenciais AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Validar identidade AWS
+        shell: bash
+        run: aws sts get-caller-identity
+
+      - name: Listar modelos foundation do Bedrock
+        shell: bash
+        run: |
+          aws bedrock list-foundation-models \
+            --region "$AWS_REGION" \
+            --by-output-modality TEXT \
+            --query 'modelSummaries[].modelId' \
+            --output table
+
+      - name: Instalar boto3 para teste opcional
+        if: env.RUN_INFERENCE == 'true'
+        shell: bash
+        run: python -m pip install --upgrade boto3
+
+      - name: Executar inferencia simples no Bedrock
+        if: env.RUN_INFERENCE == 'true'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import boto3
+
+          region = os.environ["AWS_REGION"]
+          model_id = os.environ["BEDROCK_MODEL_ID"]
+          client = boto3.client("bedrock-runtime", region_name=region)
+
+          response = client.converse(
+              modelId=model_id,
+              messages=[
+                  {
+                      "role": "user",
+                      "content": [{"text": "Responda apenas com OK AWS BEDROCK."}],
+                  }
+              ],
+              inferenceConfig={"maxTokens": 32, "temperature": 0},
+          )
+
+          print(json.dumps(response, indent=2, default=str))
+          PY
+
+      - name: Publicar resumo do job
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "# Teste AWS Bedrock"
+            echo
+            echo "- Regiao: $AWS_REGION"
+            echo "- Role ARN: $AWS_ROLE_ARN"
+            echo "- Model ID: $BEDROCK_MODEL_ID"
+            echo "- Inference habilitada: $RUN_INFERENCE"
+            echo
+            echo "Consulte os logs da execucao para ver o resultado do STS, a listagem de modelos e a inferencia opcional."
+          } >> "$GITHUB_STEP_SUMMARY"
