@@ -19,7 +19,7 @@ on:
       model_id:
         description: "Model ID para inferencia opcional"
         required: false
-        default: "amazon.nova-lite-v1:0"
+        default: "us.amazon.nova-lite-v1:0"
         type: string
 
 permissions:
